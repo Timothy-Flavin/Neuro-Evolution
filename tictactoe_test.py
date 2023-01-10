@@ -1,11 +1,12 @@
 import numpy as np
 from tictactoe import env
+from network import network
 
 class human:
   def move(self, board):
     return int(input("Select move 0-8:"))
 
-en = env([human(), human()], np.zeros(18))
+en = env(human(), human(), np.zeros(18))
 en.check_win()
 for i in range(100):
   b = np.random.randint(0,2,size=18)
@@ -20,3 +21,7 @@ en.play(print_board=True, verbose=True)
 en.reset()
 print("Game 2")
 en.play(print_board=True, verbose=True)
+en.reset()
+
+print("Game vs AI")
+en.play(players=[human(),network()], print_board=True, verbose=True)

@@ -56,6 +56,7 @@ class env:
 # returns 1 if player 1 wins and 0.5 if draw and 0 if loss  
   def play(self, players=None, print_board = False, verbose=False):
     if players is not None:
+      print("gave players")
       self.player1 = players[0]
       self.player2 = players[1]
     
