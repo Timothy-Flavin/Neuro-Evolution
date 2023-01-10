@@ -3,7 +3,6 @@ from network import network
 import random
 
 class NeuralGA:
-  
   def default_fitness(self, game, players):
     return game.play(players, print_board = False, verbose = False)
 
@@ -16,38 +15,126 @@ class NeuralGA:
     self.fit_func = fit_func
     self.env = env
   
-  def get_fitness_ttt(self, num_plays):
+  def get_fitness_ttt(self, num_plays, verbose=0):
     # for each player, get their fittness
     for i in range(self.pop_size):
+      if verbose>0:
+        print(f"Playing games for chromosome[{i}]")
       self.pop_fits[i] = 0
       # play num_plays games and get average return
       for pnum in range(num_plays):
-        self.pop_fits += self.env.play(players=[self.population[i], self.population[random.randint(0,self.popsize-1)]], print_board = False, verbose=False)
+        p2 = random.randint(0,self.pop_size-1)
+        if verbose>0:
+          print(f"Game {pnum} between p1: {i} and p2: {p2}", end='')
+        won=0
+        if verbose > 1:
+          won = self.env.play(players=[self.population[i], self.population[p2]], print_board = True, verbose=True)
+        else:
+          won = self.env.play(players=[self.population[i], self.population[p2]], print_board = False, verbose=False)
+        if verbose>0:
+          print(f" outcome: {won}")
+        self.pop_fits[i] += won
+        self.env.reset()
       self.pop_fits[i] /= num_plays
     return self.pop_fits
 
-  def roulette(self, fits=None):
+  def roulette(self, fits=None, verbose=False):
     if fits is None:
       fits = self.pop_fits
+      if verbose:
+        print("No fitness passed, using stored population fitness")
     parent_pool = []
     total_fit = np.sum(fits)
     for i in range(self.pop_size):
       wheel_val = random.random() * total_fit
       p=0
-      while wheel_val > self.pop_fits[p]:
-        wheel_val -= self.pop_fits[p]
+      while wheel_val > fits[p]:
+        wheel_val -= fits[p]
         p+=1
       parent_pool.append(self.population[p])
+      if verbose:
+        print(f"Selected parent {p} with fitness fitness: {fits[p]}")
     self.parent_pool = parent_pool
     return parent_pool
   
-  def breed(self, parent1, parent2):
-    print("breedin")
-    
-  def crossover(self, parent_pool=None):
+  def breed(self, parent1, parent2, verbose=False):
+    if verbose:
+      print("Breeding children")
+    child1 = network(parent1.input_size, parent1.layer_sizes, parent1.act_names)
+    child2 = network(parent1.input_size, parent1.layer_sizes, parent1.act_names)
+    for i in range(len(parent1.layer_sizes)):
+      rows = parent1.weights[i].shape[0]
+      cols = parent1.weights[i].shape[1]
+      biases = parent1.biases[i].shape[0]
+      
+      r_cutoff = random.randint(0,parent1.weights[i].shape[0]-1)
+      c_cutoff = random.randint(0,parent1.weights[i].shape[1]-1)
+      b_cutoff = random.randint(0,parent1.biases[i].shape[0]-1)
+      if verbose:
+        print(f"Layer [{i}] with shape {parent1.weights[i].shape}\nr_cutoff: {r_cutoff}, c_cutoff: {c_cutoff}\n{r_cutoff*cols+c_cutoff}/{rows+cols}")
+      for r in range(rows):
+        for c in range(cols):
+          if r*cols+c < r_cutoff*cols+c_cutoff:#r<r_cutoff and c<c_cutoff:
+            child1.weights[i][r,c] = parent1.weights[i][r,c]
+            child2.weights[i][r,c] = parent2.weights[i][r,c]
+          else:
+            child1.weights[i][r,c] = parent2.weights[i][r,c]
+            child2.weights[i][r,c] = parent1.weights[i][r,c]
+      for b in range(cols):
+        if b<b_cutoff:
+          child1.biases[i][b] = parent2.biases[i][b]
+          child2.biases[i][b] = parent1.biases[i][b]
+        else:
+          child1.biases[i][b] = parent1.biases[i][b]
+          child2.biases[i][b] = parent2.biases[i][b]
+    return child1, child2
+
+  def crossover(self, parent_pool=None, verbose=False):
     if parent_pool is None:
       parent_pool = self.parent_pool
-    for i in range(self.pop_size/2):
-      parent1 = parent_pool[random.randint(0,self.pop_size-1)]
-      parent2 = parent_pool[random.randint(0,self.pop_size-1)]
+    self.child_pool=[]
+
+    for i in range(int(self.pop_size/2)):
+      
+      p1 = random.randint(0,self.pop_size-1)
+      p2 = random.randint(0,self.pop_size-1)
+      parent1 = parent_pool[p1]
+      parent2 = parent_pool[p2]
+      if verbose:
+        print(f"\nParent 1: {p1}: ")
+        parent1.print_self(verbose=True)
+        print("_____________________________________________")
+        print(f"\nParent 2: {p2}: ")
+        parent2.print_self(verbose=True)
+        print("_____________________________________________")
+
+      child1, child2 = self.breed(parent1, parent2, verbose=verbose)
+
+      if verbose:
+        print(f"\nChild 1: {p1}: ")
+        child1.print_self(verbose=True)
+        print("_____________________________________________")
+        print(f"\nChild 2: {p2}: ")
+        child2.print_self(verbose=True)
+        print("_____________________________________________")
+      self.child_pool.append(child1)
+      self.child_pool.append(child2)
+  
+  def mutate(self, mutation_rate=0.05, epsilon=0.1, verbose=False):
+    for i in range(self.pop_size):
+      if random.random()<mutation_rate:
+        if verbose:
+          print(f"Child {i} selected for mutation: ")
+          self.child_pool[i].print_self(verbose=True)
+        for j in range(len(self.child_pool[i].act_names)):
+          shape = self.child_pool[i].weights[j].shape
+          self.child_pool[i].weights[j] = np.multiply(self.child_pool[i].weights[j], np.random.rand(shape[0],shape[1])*epsilon + 1)
+          self.child_pool[i].biases[j] = np.multiply(self.child_pool[i].biases[j], np.random.rand(shape[1])*epsilon + 1)
+        if verbose:
+          print(f"Child {i} after mutation: ")
+          self.child_pool[i].print_self(verbose=True)
+      elif verbose:
+        print(f"Child {i} not chosen")
+  def next_gen(self):
+    self.population = self.child_pool
 

@@ -64,9 +64,9 @@ class env:
     
     nmoves = 0
     while nmoves < 10:
-      if verbose:
-        print("Player 1 moves")
       move = self.player1.move(self.board)
+      if verbose:
+        print(f"Player 1 moves: {move}")
       # if the space chosen is free
       if self.board[move] == 0 and self.board[move+9] == 0:
         self.board[move] = 1
@@ -88,13 +88,14 @@ class env:
           print("Draw")
         return 0.5
     # Player 2's turn, player 2 sees a board where x and y are flipped
-      if verbose:
-        print("Player 2 moves")
+      
       board2 = np.zeros(self.board.shape[0])
       board2[0:9] = self.board[9:18]
       board2[9:18] = self.board[0:9]
 
-      move = self.player1.move(board2)
+      move = self.player2.move(board2)
+      if verbose:
+        print(f"Player 2 moves {move}")
       # if the space chosen is free
       if self.board[move] == 0 and self.board[move+9] == 0:
         self.board[move+9] = 1
