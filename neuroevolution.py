@@ -3,7 +3,7 @@ from network import network
 import random
 
 class rand_legal:
-  def move(self, board):
+  def move(self, board, verbose=False):
     mv=0
     legal = False
     while not legal:
@@ -30,7 +30,8 @@ class NeuralGA:
     self.illegal_reward = illegal_reward
     self.win_reward = win_reward
   
-  def get_fitness_ttt(self, num_plays, epsilon=0.5, fit_laplace=0.01, verbose=0):
+  # eps is the probability of going with the best move instead of sampleing move dist
+  def get_fitness_ttt(self, num_plays, epsilon=0.5, fit_laplace=0.01, verbose=0, eps=0.5):
     # for each player, get their fittness
     self.pop_fits = np.zeros(self.pop_fits.shape)
     self.n_plays = np.zeros(self.n_plays.shape)

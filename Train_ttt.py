@@ -1,14 +1,14 @@
 from network import network
 import time
 class human:
-  def move(self, board):
+  def move(self, board, verbose=False):
     return int(input("Select move 0-8:"))
 
 import numpy as np
 from neuroevolution import NeuralGA
 from tictactoe import env
 
-ga = NeuralGA(200, env=env(None,None,None), input_size=18,layer_sizes=np.array([64,24,9]),activations=["relu","relu","sigmoid"], legal_reward=0.1, illegal_reward=-2,win_reward=1)
+ga = NeuralGA(200, env=env(None,None,None), input_size=18,layer_sizes=np.array([24,18,14,12,9]),activations=["relu","relu","relu","relu","sigmoid"], legal_reward=-0.1, illegal_reward=-2,win_reward=2)
 
 num_gens = 1000
 eps = 0.1
@@ -23,7 +23,7 @@ crossover_time = 0
 mutate_time = 0
 
 for i in range(num_gens):
-  eps = i/num_gens
+  eps = i/num_gens/2 + 0.5
   temp_time = time.time()
   fits = ga.get_fitness_ttt(num_plays=5,epsilon=eps,fit_laplace=0.01,verbose=0)
   fit_time += time.time()-temp_time
@@ -44,6 +44,16 @@ for i in range(num_gens):
       en.play(print_board=True, verbose=True)
       en.reset()
       print("Game 2: ")
+      best_player.set_move_type(mtype = "max_legal")
+      en = env(best_player, human(), np.zeros(18))
+      en.play(print_board=True, verbose=True)
+      en.reset()
+      print("Game 3: ")
+      en = env(human(),best_player, np.zeros(18))
+      en.play(print_board=True, verbose=True)
+      en.reset()
+      print("Game 4: ")
+      best_player.set_move_type(mtype = "prob_legal")
       en = env(human(),best_player, np.zeros(18))
       en.play(print_board=True, verbose=True)
       en.reset()

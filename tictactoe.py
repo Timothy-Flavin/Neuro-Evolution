@@ -65,7 +65,7 @@ class env:
     
     nmoves = 0
     while nmoves < 10:
-      move = self.player1.move(self.board)
+      move = self.player1.move(self.board, verbose=verbose)
       if verbose:
         print(f"Player 1 moves: {move}")
       # if the space chosen is free
@@ -94,7 +94,7 @@ class env:
       board2[0:9] = self.board[9:18]
       board2[9:18] = self.board[0:9]
 
-      move = self.player2.move(board2)
+      move = self.player2.move(board2, verbose=verbose)
       if verbose:
         print(f"Player 2 moves {move}")
       # if the space chosen is free
@@ -126,7 +126,7 @@ class env:
     
     nmoves = 0
     while nmoves < 10:
-      move = self.player1.move(self.board)
+      move = self.player1.move(self.board, verbose=verbose)
       if verbose:
         print(f"Player 1 moves: {move}")
       # if the space chosen is free
@@ -158,7 +158,7 @@ class env:
       board2[0:9] = self.board[9:18]
       board2[9:18] = self.board[0:9]
 
-      move = self.player2.move(board2)
+      move = self.player2.move(board2, verbose=verbose)
       if verbose:
         print(f"Player 2 moves {move}")
       # if the space chosen is free
