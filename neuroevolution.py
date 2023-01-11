@@ -16,56 +16,67 @@ class NeuralGA:
   def default_fitness(self, game, players):
     return game.play(players, print_board = False, verbose = False)
 
-  def __init__(self, pop_size, env, fit_func = default_fitness, input_size=18, layer_sizes=np.array([32, 16, 9]), activations=["relu","relu","sigmoid"]):
+  def __init__(self, pop_size, env, fit_func = default_fitness, input_size=18, layer_sizes=np.array([32, 16, 9]), activations=["relu","relu","sigmoid"], legal_reward=0.1, illegal_reward=-1,win_reward=1):
     self.pop_size = pop_size
     self.population = []
     self.pop_fits = np.zeros(pop_size)
+    self.n_plays = np.zeros(pop_size)
     for i in range(pop_size):
       self.population.append(network(input_size, layer_sizes, activations))
     self.fit_func = fit_func
     self.env = env
     self.rand_player = rand_legal()
+    self.legal_reward = legal_reward
+    self.illegal_reward = illegal_reward
+    self.win_reward = win_reward
   
-  def get_fitness_ttt(self, num_plays, epsilon=0.5, fit_laplace=0.05, verbose=0):
+  def get_fitness_ttt(self, num_plays, epsilon=0.5, fit_laplace=0.01, verbose=0):
     # for each player, get their fittness
+    self.pop_fits = np.zeros(self.pop_fits.shape)
+    self.n_plays = np.zeros(self.n_plays.shape)
     for i in range(self.pop_size):
       if verbose>0:
         print(f"Playing games for chromosome[{i}]")
-      self.pop_fits[i] = 0
       # play num_plays games and get average return
+      p2i=-1
       for pnum in range(num_plays):
+        p2i=-1
         opponent = self.rand_player
         # choose neural opponent
         if random.random() < epsilon:
-          p2 = random.randint(0,self.pop_size-1)
-          opponent = self.population[p2]
+          p2i = random.randint(0,self.pop_size-1)
+          opponent = self.population[p2i]
           if verbose>0:
-            print(f"Game {pnum} between p1: {i} and p2: {p2}", end='')
+            print(f"Game {pnum} between p1: {i} and p2: {p2i} ", end='')
         # random legal moves opponent
         else:
           if verbose>0:
-            print(f"Game {pnum} between p1: {i} and random", end='')
+            print(f"Game {pnum} between p1: {i} and random ", end='')
         
         p1 = self.population[i]
         p2 = opponent
         first = random.randint(0,1)
-        won=0
-        v=False
-        if verbose > 1:
-          v = True
+        reward = 0
+        v = verbose>1
         if first == 0:
           if verbose>0:
-            print("Payer 1 goes first: ")
-          won = self.env.play(players=[p1, p2], print_board = v, verbose=v)
+            print("Player 1 goes first: ")
+          reward,reward2 = self.env.play(players=[p1, p2], print_board = v, verbose=v, legal_reward=self.legal_reward, illegal_reward=self.illegal_reward,win_reward=self.win_reward)
         else:
           if verbose>0:
-            print("Payer 2 goes first: ")
-          won = 1-self.env.play(players=[p2, p1], print_board = v, verbose=v)
+            print("Player 2 goes first: ")
+          reward2,reward = self.env.play(players=[p2, p1], print_board = v, verbose=v, legal_reward=self.legal_reward, illegal_reward=self.illegal_reward,win_reward=self.win_reward)
         if verbose>0:
-          print(f" outcome: {won}")
-        self.pop_fits[i] += won
+          print(f" outcome: {reward}")
+        self.pop_fits[i] += reward
+        self.n_plays[i] += 1
+        if p2i !=-1:
+          self.pop_fits[p2i] += reward2
+          self.n_plays[p2i] += 1
         self.env.reset()
-      self.pop_fits[i] /= num_plays
+    if verbose>0:
+      print(self.pop_fits)
+    self.pop_fits /= self.n_plays#self.n_plays
     self.pop_fits += fit_laplace
     return self.pop_fits
 
@@ -74,6 +85,10 @@ class NeuralGA:
       fits = self.pop_fits
       if verbose:
         print("No fitness passed, using stored population fitness")
+    if np.min(fits) < 0:
+      if verbose:
+        print("Fitness negative so moving all fitness up")
+      fits -= np.min(fits)
     parent_pool = []
     total_fit = np.sum(fits)
     for i in range(self.pop_size):
@@ -120,6 +135,27 @@ class NeuralGA:
           child2.biases[i][b] = parent2.biases[i][b]
     return child1, child2
 
+  def fast_breed(self, parent1, parent2, verbose=False):
+    if verbose:
+      print("Breeding children")
+    child1 = network(parent1.input_size, parent1.layer_sizes, parent1.act_names)
+    child2 = network(parent1.input_size, parent1.layer_sizes, parent1.act_names)
+    for i in range(len(parent1.layer_sizes)):
+      p1w = parent1.weights[i].flatten()
+      p2w = parent2.weights[i].flatten()
+      
+      cutoff = random.randint(0,p1w.shape[0]-1)
+      if verbose:
+        print(f"Shape: {parent1.weights[i].shape}, Tot: {p1w.shape}, cutoff: {cutoff}")
+        print(f"Concatinated shape: {np.concatenate([p1w[0:cutoff], p2w[cutoff:]]).shape}")
+      child1.weights[i] = np.reshape(np.concatenate([p1w[0:cutoff], p2w[cutoff:]]),parent1.weights[i].shape)
+      child2.weights[i] = np.reshape(np.concatenate([p2w[0:cutoff], p1w[cutoff:]]),parent1.weights[i].shape)
+      
+      cutoff = random.randint(0,parent1.biases[i].shape[0]-1)
+      child1.biases[i] = np.concatenate([parent1.biases[i][0:cutoff], parent2.biases[i][cutoff:]])
+      child2.biases[i] = np.concatenate([parent2.biases[i][0:cutoff], parent1.biases[i][cutoff:]])
+    return child1, child2
+
   def crossover(self, parent_pool=None, verbose=False):
     if parent_pool is None:
       parent_pool = self.parent_pool
@@ -139,7 +175,7 @@ class NeuralGA:
         parent2.print_self(verbose=True)
         print("_____________________________________________")
 
-      child1, child2 = self.breed(parent1, parent2, verbose=verbose)
+      child1, child2 = self.fast_breed(parent1, parent2, verbose=verbose)
 
       if verbose:
         print(f"\nChild 1: {p1}: ")

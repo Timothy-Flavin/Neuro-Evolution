@@ -54,7 +54,8 @@ class env:
       print()
 
 # returns 1 if player 1 wins and 0.5 if draw and 0 if loss  
-  def play(self, players=None, print_board = False, verbose=False):
+  def play_simple(self, players=None, print_board = False, verbose=False):
+    print("hi")
     if players is not None:
       self.player1 = players[0]
       self.player2 = players[1]
@@ -111,4 +112,71 @@ class env:
         if verbose:
           print("Player 2 wins!")
         return 0
+      
+
+  def play(self, players=None, print_board = False, verbose=False, legal_reward=0.1, illegal_reward=-1,win_reward=1):
+    p1reward = 0
+    p2reward = 0
+    if players is not None:
+      self.player1 = players[0]
+      self.player2 = players[1]
+    
+    if print_board:
+      self.print_board()
+    
+    nmoves = 0
+    while nmoves < 10:
+      move = self.player1.move(self.board)
+      if verbose:
+        print(f"Player 1 moves: {move}")
+      # if the space chosen is free
+      if self.board[move] == 0 and self.board[move+9] == 0:
+        self.board[move] = 1
+        nmoves +=1
+        p1reward += legal_reward
+      else:
+        if verbose:
+          print("Player 1 loses from illegal move")
+        p1reward += illegal_reward
+        return p1reward, p2reward
+      if print_board:
+        #print(self.board)
+        self.print_board()
+      won = self.check_win()
+      if won:
+        if verbose:
+          print("Player 1 wins!")
+        p1reward += win_reward
+        return p1reward, p2reward
+      if nmoves == 9:
+        if verbose:
+          print("Draw")
+        return p1reward, p2reward
+    # Player 2's turn, player 2 sees a board where x and y are flipped
+      
+      board2 = np.zeros(self.board.shape[0])
+      board2[0:9] = self.board[9:18]
+      board2[9:18] = self.board[0:9]
+
+      move = self.player2.move(board2)
+      if verbose:
+        print(f"Player 2 moves {move}")
+      # if the space chosen is free
+      if self.board[move] == 0 and self.board[move+9] == 0:
+        self.board[move+9] = 1
+        p2reward+=legal_reward
+        nmoves +=1
+      else:
+        if verbose:
+          print("Player 2 loses from illegal move")
+        p2reward+=illegal_reward
+        return p1reward,p2reward
+      if print_board:
+        self.print_board()
+      won = self.check_win()
+      if won:
+        if verbose:
+          print("Player 2 wins!")
+        p2reward+=win_reward
+        return p1reward,p2reward
       
