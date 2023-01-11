@@ -2,6 +2,16 @@ import numpy as np
 from network import network
 import random
 
+class rand_legal:
+  def move(self, board):
+    mv=0
+    legal = False
+    while not legal:
+      mv = random.randint(0,8)
+      if board[mv]==0 and board[mv+9]==0:
+        legal=True
+    return mv
+
 class NeuralGA:
   def default_fitness(self, game, players):
     return game.play(players, print_board = False, verbose = False)
@@ -14,8 +24,9 @@ class NeuralGA:
       self.population.append(network(input_size, layer_sizes, activations))
     self.fit_func = fit_func
     self.env = env
+    self.rand_player = rand_legal()
   
-  def get_fitness_ttt(self, num_plays, verbose=0):
+  def get_fitness_ttt(self, num_plays, epsilon=0.5, fit_laplace=0.05, verbose=0):
     # for each player, get their fittness
     for i in range(self.pop_size):
       if verbose>0:
@@ -23,19 +34,39 @@ class NeuralGA:
       self.pop_fits[i] = 0
       # play num_plays games and get average return
       for pnum in range(num_plays):
-        p2 = random.randint(0,self.pop_size-1)
-        if verbose>0:
-          print(f"Game {pnum} between p1: {i} and p2: {p2}", end='')
-        won=0
-        if verbose > 1:
-          won = self.env.play(players=[self.population[i], self.population[p2]], print_board = True, verbose=True)
+        opponent = self.rand_player
+        # choose neural opponent
+        if random.random() < epsilon:
+          p2 = random.randint(0,self.pop_size-1)
+          opponent = self.population[p2]
+          if verbose>0:
+            print(f"Game {pnum} between p1: {i} and p2: {p2}", end='')
+        # random legal moves opponent
         else:
-          won = self.env.play(players=[self.population[i], self.population[p2]], print_board = False, verbose=False)
+          if verbose>0:
+            print(f"Game {pnum} between p1: {i} and random", end='')
+        
+        p1 = self.population[i]
+        p2 = opponent
+        first = random.randint(0,1)
+        won=0
+        v=False
+        if verbose > 1:
+          v = True
+        if first == 0:
+          if verbose>0:
+            print("Payer 1 goes first: ")
+          won = self.env.play(players=[p1, p2], print_board = v, verbose=v)
+        else:
+          if verbose>0:
+            print("Payer 2 goes first: ")
+          won = 1-self.env.play(players=[p2, p1], print_board = v, verbose=v)
         if verbose>0:
           print(f" outcome: {won}")
         self.pop_fits[i] += won
         self.env.reset()
       self.pop_fits[i] /= num_plays
+    self.pop_fits += fit_laplace
     return self.pop_fits
 
   def roulette(self, fits=None, verbose=False):
@@ -71,7 +102,7 @@ class NeuralGA:
       c_cutoff = random.randint(0,parent1.weights[i].shape[1]-1)
       b_cutoff = random.randint(0,parent1.biases[i].shape[0]-1)
       if verbose:
-        print(f"Layer [{i}] with shape {parent1.weights[i].shape}\nr_cutoff: {r_cutoff}, c_cutoff: {c_cutoff}\n{r_cutoff*cols+c_cutoff}/{rows+cols}")
+        print(f"Layer [{i}] with shape {parent1.weights[i].shape}\nr_cutoff: {r_cutoff}, c_cutoff: {c_cutoff}\n{r_cutoff*cols+c_cutoff}/{rows*cols}")
       for r in range(rows):
         for c in range(cols):
           if r*cols+c < r_cutoff*cols+c_cutoff:#r<r_cutoff and c<c_cutoff:
@@ -128,8 +159,8 @@ class NeuralGA:
           self.child_pool[i].print_self(verbose=True)
         for j in range(len(self.child_pool[i].act_names)):
           shape = self.child_pool[i].weights[j].shape
-          self.child_pool[i].weights[j] = np.multiply(self.child_pool[i].weights[j], np.random.rand(shape[0],shape[1])*epsilon + 1)
-          self.child_pool[i].biases[j] = np.multiply(self.child_pool[i].biases[j], np.random.rand(shape[1])*epsilon + 1)
+          self.child_pool[i].weights[j] = np.multiply(self.child_pool[i].weights[j], np.random.rand(shape[0],shape[1])*epsilon -epsilon/2 + 1)
+          self.child_pool[i].biases[j] = np.multiply(self.child_pool[i].biases[j], np.random.rand(shape[1])*epsilon -epsilon/2 + 1)
         if verbose:
           print(f"Child {i} after mutation: ")
           self.child_pool[i].print_self(verbose=True)
