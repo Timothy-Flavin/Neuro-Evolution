@@ -176,7 +176,8 @@ class NeuralGA:
         parent2.print_self(verbose=True)
         print("_____________________________________________")
 
-      child1, child2 = self.fast_breed(parent1, parent2, verbose=verbose)
+      #child1, child2 = self.fast_breed(parent1, parent2, verbose=verbose)
+      child1, child2 = parent1, parent2
 
       if verbose:
         print(f"\nChild 1: {p1}: ")

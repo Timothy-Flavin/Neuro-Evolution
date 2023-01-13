@@ -64,7 +64,7 @@ for i in range(num_gens):
   ga.crossover()
   crossover_time += time.time() - temp_time
   temp_time = time.time()
-  ga.mutate(mutation_rate=0.1,verbose=False)
+  ga.mutate(mutation_rate=0.3,verbose=False)
   mutate_time += time.time() - temp_time
   ga.next_gen()
 
