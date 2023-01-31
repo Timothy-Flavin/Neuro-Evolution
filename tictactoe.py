@@ -18,6 +18,7 @@ class env:
     self.board = np.zeros(18)
     self.current_player = 0
     self.nmoves = 0  
+    return [self.board]
 
   def check_win(self, board=None):
     if board is None:
@@ -185,9 +186,10 @@ class env:
         return p1reward,p2reward
 
   def step(self, action, print_board = False, verbose=False, legal_reward=0.1, illegal_reward=-1,win_reward=1):
-    reward = 0
-    if print_board:
-      self.print_board()
+    reward = 0    
+    if self.nmoves == 0:
+      self.current_player = 0
+    
     board = self.board
 
     if verbose:
@@ -195,7 +197,9 @@ class env:
     # if the space chosen is free
     if self.board[action] == 0 and self.board[action+9] == 0:
       self.board[action + self.current_player*9] = 1
-      self.nmoves +=1
+      self.nmoves += 1
+      if print_board:
+        self.print_board()
       reward += legal_reward
       won = self.check_win()
 
@@ -207,19 +211,25 @@ class env:
         board[9:18] = self.board[0:9]
 
       if won:
+        #print(f"Player {self.current_player} wins!")
         if verbose:
           print(f"Player {self.current_player} wins!")
         reward += win_reward
         #observation, reward, terminated, truncated, info
+        self.current_player = 1-self.current_player
         return board, reward, True, False, None
       if self.nmoves == 9:
         if verbose:
           print("Draw")
+        self.current_player = 1-self.current_player
         return board, reward, True, False, None
+      self.current_player = 1-self.current_player
+      return board, reward, False, False, None
     else:
       if verbose:
-        print("Player 1 loses from illegal move")
+        print(f"Player {self.current_player} loses from illegal move")
       reward += illegal_reward
+      self.current_player = 1-self.current_player
       return board, reward, True, False, None
 
 
