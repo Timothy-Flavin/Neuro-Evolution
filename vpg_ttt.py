@@ -10,7 +10,8 @@ import random
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
-def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, legal_reward=0.1, illegal_reward=-1,win_reward=1):
+#policy1, policy2, optimizer1, optimizer2,
+def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, legal_reward=0.1, illegal_reward=-1,win_reward=1, loss_reward=-1):
   # Help us to calculate the score during the training
   scores = []
   # Line 3 of pseudocode
@@ -24,7 +25,11 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
     # Line 4 of pseudocode tic tac toe can only go 10 moves
     for t in range(10):
       #print(state)
-      action, log_prob = policy.act(state)
+      action, log_prob = 0, 0
+      if env.current_player == 0:
+        action, log_prob = policy.act(state)
+      else: 
+        action, log_prob = policy.act(state)
       state, reward, done, doner, _ = env.step(action, print_board=False, verbose=False, legal_reward=legal_reward, illegal_reward=illegal_reward,win_reward=win_reward)
       #input()
       #print(reward)
@@ -36,9 +41,18 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
         rewards_p2.append(reward)
       
       if done or doner:
+        if done: # done is terminated, doner is from illegal moves or cat
+          if env.current_player == 0:
+            #print("player 2 lost")
+            rewards_p2[-1] += loss_reward
+          else:
+            #print("player 1 lost")
+            rewards_p1[-1] += loss_reward
         break
 
-    scores.append(sum(rewards_p1) + sum(rewards_p2))
+    scores.append(sum(rewards_p1))
+    scores.append(sum(rewards_p2))
+    #print(f"r1: {sum(rewards_p1)}, {sum(rewards_p2)}")
 
     # Line 6 of pseudocode: calculate the return
     returns1 = deque(maxlen=10)
@@ -100,7 +114,7 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
 
 
 ttt_hyperparameters = {
-    "h_sizes": [32,16],
+    "h_sizes": [128,64,32,12],
     "n_training_episodes": 10000,
     "n_evaluation_episodes": 10,
     "gamma": 1.0,
@@ -110,7 +124,8 @@ ttt_hyperparameters = {
     "action_space": 9,
     "win_reward": 2,
     "illegal_punish": -1,
-    "legal_reward": 0
+    "legal_reward": 0,
+    "loss_reward": -0.5,
 }
 
 ttt_policy = LeakyMLP(
@@ -134,6 +149,7 @@ scores, policy = reinforce(
     legal_reward=ttt_hyperparameters["legal_reward"],
     illegal_reward=ttt_hyperparameters["illegal_punish"],
     win_reward=ttt_hyperparameters["win_reward"],
+    loss_reward=ttt_hyperparameters["loss_reward"],
 )
 
 state = en.reset()[0]
@@ -150,10 +166,13 @@ while True:
   while not (done or truncated):
     print(f"current player: {en.current_player}")
     if en.current_player == human:
-      action = int(input("Input action: "))
+      #action = int(input("Input action: "))
+      print(f"policy played: {action} with probability {log_prob}")
+      action, log_prob = policy.act(state)
     else:
       print(f"policy played: {action} with probability {log_prob}")
       action, log_prob = policy.act(state)
     state, reward, done, truncated, info = en.step(action, True, True)
     print(f"reward: {reward}, state {state}, done: {done}, truncated: {truncated}")
+    input("next turn?")
   state = en.reset()[0]

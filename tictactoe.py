@@ -222,7 +222,7 @@ class env:
         if verbose:
           print("Draw")
         self.current_player = 1-self.current_player
-        return board, reward, True, False, None
+        return board, reward, False, True, None
       self.current_player = 1-self.current_player
       return board, reward, False, False, None
     else:
@@ -230,6 +230,6 @@ class env:
         print(f"Player {self.current_player} loses from illegal move")
       reward += illegal_reward
       self.current_player = 1-self.current_player
-      return board, reward, True, False, None
+      return board, reward, False, True, None
 
 
