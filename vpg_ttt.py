@@ -2,7 +2,7 @@ import torch
 import torch.optim as optim
 import numpy as np
 from tictactoe import env
-from torch_network import LeakyMLP
+from torch_network import LeakyMLP, LeakyMLP2
 from collections import deque
 import random
 # reinforce code adapted from hugginface RL course
@@ -11,9 +11,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 
 #policy1, policy2, optimizer1, optimizer2,
-def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, legal_reward=0.1, illegal_reward=-1,win_reward=1, loss_reward=-1):
+def reinforce(policy1, policy2, optimizer1, optimizer2, n_training_episodes, gamma, print_every, env, legal_reward=0.1, illegal_reward=-1,win_reward=1, loss_reward=-1):
   # Help us to calculate the score during the training
-  scores = []
+  scores1 = []
+  scores2 = []
   # Line 3 of pseudocode
   for i_episode in range(1, n_training_episodes + 1):
     saved_log_probs_p1 = []
@@ -26,14 +27,15 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
     for t in range(10):
       #print(state)
       action, log_prob = 0, 0
-      if env.current_player == 0:
-        action, log_prob = policy.act(state)
+      cur_play = env.current_player
+      if cur_play == 0:
+        action, log_prob = policy1.act(state)
       else: 
-        action, log_prob = policy.act(state)
+        action, log_prob = policy2.act(state)
       state, reward, done, doner, _ = env.step(action, print_board=False, verbose=False, legal_reward=legal_reward, illegal_reward=illegal_reward,win_reward=win_reward)
       #input()
       #print(reward)
-      if env.current_player == 0:
+      if cur_play == 0:
         saved_log_probs_p1.append(log_prob)
         rewards_p1.append(reward)
       else:
@@ -42,7 +44,7 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
       
       if done or doner:
         if done: # done is terminated, doner is from illegal moves or cat
-          if env.current_player == 0:
+          if cur_play == 0:
             #print("player 2 lost")
             rewards_p2[-1] += loss_reward
           else:
@@ -50,8 +52,8 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
             rewards_p1[-1] += loss_reward
         break
 
-    scores.append(sum(rewards_p1))
-    scores.append(sum(rewards_p2))
+    scores1.append(sum(rewards_p1))
+    scores2.append(sum(rewards_p2))
     #print(f"r1: {sum(rewards_p1)}, {sum(rewards_p2)}")
 
     # Line 6 of pseudocode: calculate the return
@@ -78,10 +80,10 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
     #print("returns 1 and 2 before norm")
     #print(returns1.std())
     #print(returns2.std())
-    if len(returns1)<0:
-      returns1 = (returns1 - returns1.mean()) / (returns1.std() + eps)
-    if len(returns2)<0:
-      returns2 = (returns2 - returns2.mean()) / (returns2.std() + eps)
+    #if len(returns1)<0:
+      #returns1 = (returns1 - returns1.mean()) / (returns1.std() + eps)
+    #if len(returns2)<0:
+      #returns2 = (returns2 - returns2.mean()) / (returns2.std() + eps)
     
     #print("returns 1 and 2 after norm")
     #print(returns1)
@@ -90,31 +92,40 @@ def reinforce(policy, optimizer, n_training_episodes, gamma, print_every, env, l
     #print(rewards_p1)
     #print(rewards_p2)
     # Line 7:
-    policy_loss = []
+    policy_loss1 = []
+    policy_loss2 = []
     for log_prob, disc_return in zip(saved_log_probs_p1, returns1):
-      policy_loss.append(-log_prob * disc_return)
+      policy_loss1.append(-log_prob * disc_return)
     for log_prob, disc_return in zip(saved_log_probs_p2, returns2):
-      policy_loss.append(-log_prob * disc_return)
+      policy_loss2.append(-log_prob * disc_return)
     
     #print(policy_loss)
-    policy_loss = torch.cat(policy_loss).sum()
-    #print(policy_loss)
+    policy_loss1 = torch.cat(policy_loss1).sum()
+    policy_loss2 = torch.cat(policy_loss2).sum()
+    #print(policy_loss1)
+    #print(policy_loss2)
     #input("loss look ok?")
     # Line 8: PyTorch prefers gradient descent
-    optimizer.zero_grad()
-    policy_loss.backward()
-    optimizer.step()
+    optimizer1.zero_grad()
+    policy_loss1.backward()
+    optimizer1.step()
+    #print("hi")
+    #input("made it past step 1")
+    
+    optimizer2.zero_grad()
+    policy_loss2.backward()
+    optimizer2.step()
 
     if i_episode % print_every == 0:
-        print("Episode {}\tAverage Score: {:.2f}".format(i_episode, np.mean(scores)))
+        print("Episode {}\tAverage Score1: {:.2f} Score2: {:.2f}".format(i_episode, np.mean(scores1), np.mean(scores2)))
 
-  return scores, policy
+  return scores1, scores2, policy1, policy2
 
 
 
 
 ttt_hyperparameters = {
-    "h_sizes": [128,64,32,12],
+    "h_sizes": [128,64,32,32],
     "n_training_episodes": 10000,
     "n_evaluation_episodes": 10,
     "gamma": 1.0,
@@ -124,24 +135,33 @@ ttt_hyperparameters = {
     "action_space": 9,
     "win_reward": 2,
     "illegal_punish": -1,
-    "legal_reward": 0,
-    "loss_reward": -0.5,
+    "legal_reward": 1,
+    "loss_reward": -0.3,
 }
 
-ttt_policy = LeakyMLP(
+ttt_policy1 = LeakyMLP(
     ttt_hyperparameters["state_space"],
     ttt_hyperparameters["action_space"],
     ttt_hyperparameters["h_sizes"],
 ).to(device)
-ttt_optimizer = optim.Adam(ttt_policy.parameters(), lr=ttt_hyperparameters["lr"])
+ttt_policy2 = LeakyMLP2(
+    ttt_hyperparameters["state_space"],
+    ttt_hyperparameters["action_space"],
+    ttt_hyperparameters["h_sizes"],
+).to(device)
+
+ttt_optimizer1 = optim.Adam(ttt_policy1.parameters(), lr=ttt_hyperparameters["lr"])
+ttt_optimizer2 = optim.Adam(ttt_policy2.parameters(), lr=1e-2)
 
 #setting up environment
 en = env(None, None)
 en.reset()
-
-scores, policy = reinforce(
-    ttt_policy,
-    ttt_optimizer,
+#torch.autograd.set_detect_anomaly(True)
+scores1, scores2, policy1, policy2 = reinforce(
+    ttt_policy1,
+    ttt_policy2,
+    ttt_optimizer1,
+    ttt_optimizer2,
     ttt_hyperparameters["n_training_episodes"],
     ttt_hyperparameters["gamma"],
     500,
@@ -166,13 +186,15 @@ while True:
   while not (done or truncated):
     print(f"current player: {en.current_player}")
     if en.current_player == human:
-      #action = int(input("Input action: "))
-      print(f"policy played: {action} with probability {log_prob}")
-      action, log_prob = policy.act(state)
+      action = int(input("Input action: "))
     else:
-      print(f"policy played: {action} with probability {log_prob}")
-      action, log_prob = policy.act(state)
+      if en.current_player == 0:
+        print(f"policy1 played: {action} with probability {log_prob}")
+        action, log_prob = policy1.act(state)
+      else:
+        print(f"policy2 played: {action} with probability {log_prob}")
+        action, log_prob = policy2.act(state)
     state, reward, done, truncated, info = en.step(action, True, True)
     print(f"reward: {reward}, state {state}, done: {done}, truncated: {truncated}")
-    input("next turn?")
+    #input("next turn?")
   state = en.reset()[0]
