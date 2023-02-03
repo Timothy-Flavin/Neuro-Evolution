@@ -7,9 +7,9 @@ def relu(num):
   return np.maximum(num,0)
 
 class network:
-  def __init__(self, input_size=18, layer_sizes=np.array([32, 16, 9]), activations=["relu","relu","sigmoid"]):
+  def __init__(self, input_size=18, layer_sizes=np.array([32, 16, 9]), activations=["relu","relu","sigmoid"], weights=None, biases = None):
     self.fitness=0
-    self.move = self.move_max
+    self.move = self.move_max_legal
     if layer_sizes.shape[0] != len(activations):
       raise(ValueError("Layer sizes and activations have different numbers of layers"))
 
@@ -25,14 +25,17 @@ class network:
     self.layer_sizes = layer_sizes
     self.input_size = input_size
 
-    self.weights = []
-    self.biases = []
-    self.weights.append(np.random.random((input_size, layer_sizes[0]))-0.5)
-    self.biases.append(np.random.random(size=self.layer_sizes[0])-0.5)
-    for i in range(1,len(self.acts)):
-      self.weights.append(np.random.random((layer_sizes[i-1],layer_sizes[i]))-0.5)
-      self.biases.append(np.random.random(size=self.layer_sizes[i])-0.5)
-
+    if weights is None and biases is None:
+      self.weights = []
+      self.biases = []
+      self.weights.append(np.random.random((input_size, layer_sizes[0]))-0.5)
+      self.biases.append(np.random.random(size=self.layer_sizes[0])-0.5)
+      for i in range(1,len(self.acts)):
+        self.weights.append(np.random.random((layer_sizes[i-1],layer_sizes[i]))-0.5)
+        self.biases.append(np.random.random(size=self.layer_sizes[i])-0.5)
+    else:
+      self.weights = weights
+      self.biases = biases
   def print_self(self, verbose=False):
     print(f"\nInput size: {self.input_size}\nLayer sizes: {self.layer_sizes},\nActivations: {self.act_names}")
     
@@ -82,7 +85,7 @@ class network:
       print(f"move type: prob, max: {mat}")
     return np.argmax(mat)
   
-  def move_prob(self, state, verbose=True):
+  def move_prob(self, state, verbose=False):
     mat = self.feed_forward(state)
     mat /= np.sum(mat)
     mv=0
@@ -100,17 +103,22 @@ class network:
     mat=mat/sum(mat)
     if verbose:
       print(f"mat before legal: {mat}")
-    inv_state = 1-np.maximum(state[0:9],state[9:])
+    inv_state = 1-np.abs(state)
+    if state.shape[0] > 9:
+      inv_state = 1-np.maximum(state[0:9],state[9:])
+      
     mat = mat * inv_state
     mat=mat/sum(mat)
     if verbose:
       print(f"move type: max_legal, max: {mat}")
     return np.argmax(mat)
   
-  def move_prob_legal(self, state, verbose=True):
+  def move_prob_legal(self, state, verbose=False):
     mat = self.feed_forward(state)
     mat /= np.sum(mat)
-    inv_state = 1-np.maximum(state[0:9],state[9:])
+    inv_state = 1-np.abs(state)
+    if state.shape[0] > 9:
+      inv_state = 1-np.maximum(state[0:9],state[9:])
     mat = mat * inv_state
     mat=mat/sum(mat)
     mv=0
