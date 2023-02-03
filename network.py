@@ -8,7 +8,8 @@ def relu(num):
 
 class network:
   def __init__(self, input_size=18, layer_sizes=np.array([32, 16, 9]), activations=["relu","relu","sigmoid"]):
-    self.move = self.move_max_legal
+    self.fitness=0
+    self.move = self.move_max
     if layer_sizes.shape[0] != len(activations):
       raise(ValueError("Layer sizes and activations have different numbers of layers"))
 

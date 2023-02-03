@@ -41,9 +41,9 @@ class LeakyMLP(nn.Module):
     return action.item(), m.log_prob(action)
 
 
-class LeakyMLP2(nn.Module):
+class SigMLP(nn.Module):
   def __init__(self, i_size, o_size, h_sizes):
-    super(LeakyMLP2, self).__init__()
+    super(SigMLP, self).__init__()
     self.layers = nn.ModuleList()
     #self.layers = []
     self.layers.append(nn.Linear(i_size, h_sizes[0]))
@@ -52,23 +52,14 @@ class LeakyMLP2(nn.Module):
     self.layers.append(nn.Linear(h_sizes[-1], o_size))
 
   def forward(self, x):
-    #print(f"\n\n Forward pass: \n")
-    #print(x)
-    for i in range(len(self.layers)-2):
-      x = F.leaky_relu(self.layers[i](x))
-      #print(f" Layer {i}: {self.layers[i].weight}")
-      #print(f"x {i}: {x}")
-    x = torch.sigmoid(self.layers[-2](x))
+    for i in range(len(self.layers)-1):
+      x = torch.sigmoid(self.layers[i](x))
     x = self.layers[-1](x)
-    #print(x)
     return F.softmax(x, dim=1)
 
   def act(self, state):
     state = torch.from_numpy(state).flatten().float().unsqueeze(0).to(device)
     probs = self.forward(state).cpu()
-    #print(probs)
-    #input("look ok?")
     m = Categorical(probs)
     action = m.sample()
-    #print(action)
     return action.item(), m.log_prob(action)

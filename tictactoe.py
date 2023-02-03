@@ -14,13 +14,14 @@ class env:
 
     self.current_player = True
 
-  def reset(self):
-    self.board = np.zeros(18)
+  def reset(self, bsize=9):
+    
+    self.board = np.zeros(bsize)
     self.current_player = 0
     self.nmoves = 0  
     return [self.board]
 
-  def check_win(self, board=None):
+  def check_win_old(self, board=None):
     if board is None:
       board = self.board
 
@@ -44,7 +45,29 @@ class env:
     else:
       return False
 
-  def print_board(self, board=None):
+  def check_win(self, board=None):
+    if board is None:
+      board = self.board
+
+    indices = np.array([
+      [0,1,2],
+      [3,4,5],
+      [6,7,8],
+      [0,3,6],
+      [1,4,7],
+      [2,5,8],
+      [0,4,8],
+      [2,4,6],
+    ])
+    for i in range(indices.shape[0]):
+      if np.array_equal(board[indices[i,:]],np.ones(3)):
+        return True
+      if np.array_equal(board[indices[i,:]],-1*np.ones(3)):
+        return True
+    else:
+      return False
+
+  def print_board_old(self, board=None):
     if board is None:
       board = self.board
     
@@ -58,6 +81,19 @@ class env:
           print('-',end=' ')
       print()
 
+  def print_board(self, board=None):
+    if board is None:
+      board = self.board
+    
+    for r in range(3):
+      for c in range(3):
+        if board[c+3*r] == 1:
+          print('x',end=' ')
+        elif board[c+3*r] == -1:
+          print('o',end=' ')
+        else:
+          print('-',end=' ')
+      print()
 # returns 1 if player 1 wins and 0.5 if draw and 0 if loss  
   def play_simple(self, players=None, print_board = False, verbose=False):
     print("hi")
@@ -118,7 +154,6 @@ class env:
           print("Player 2 wins!")
         return 0
       
-
   def play(self, players=None, print_board = False, verbose=False, legal_reward=0.1, illegal_reward=-1,win_reward=1):
     p1reward = 0
     p2reward = 0
@@ -195,6 +230,50 @@ class env:
     if verbose:
       print(f"Player {self.current_player} moves: {action}")
     # if the space chosen is free
+    if self.board[action] == 0:
+      if self.current_player == 0:
+        self.board[action] = 1
+      else:
+        self.board[action] = -1
+      self.nmoves += 1
+      if print_board:
+        self.print_board()
+      reward += legal_reward
+      won = self.check_win()
+
+      if won:
+        #print(f"Player {self.current_player} wins!")
+        if verbose:
+          print(f"Player {self.current_player} wins!")
+        reward += win_reward
+        #observation, reward, terminated, truncated, info
+        self.current_player = 1-self.current_player
+        return board, reward, True, False, None
+      if self.nmoves == 9:
+        if verbose:
+          print("Draw")
+        self.current_player = 1-self.current_player
+        return board, reward, False, True, None
+      self.current_player = 1-self.current_player
+      return board, reward, False, False, None
+    else:
+      if verbose:
+        print(f"Player {self.current_player} loses from illegal move")
+      reward += illegal_reward
+      self.current_player = 1-self.current_player
+      return board, reward, False, True, None
+
+
+def step_old(self, action, print_board = False, verbose=False, legal_reward=0.1, illegal_reward=-1,win_reward=1):
+    reward = 0    
+    if self.nmoves == 0:
+      self.current_player = 0
+    
+    board = self.board
+
+    if verbose:
+      print(f"Player {self.current_player} moves: {action}")
+    # if the space chosen is free
     if self.board[action] == 0 and self.board[action+9] == 0:
       self.board[action + self.current_player*9] = 1
       self.nmoves += 1
@@ -231,5 +310,4 @@ class env:
       reward += illegal_reward
       self.current_player = 1-self.current_player
       return board, reward, False, True, None
-
 
